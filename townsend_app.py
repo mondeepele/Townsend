@@ -2,14 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
 
-# Configure page settings
+# Configure page layout
 st.set_page_config(
-    page_title="Townsend Breakdown Simulator",
+    page_title="EE601 High Voltage Engineering - Townsend Simulator",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Apply global dark styling
+# Dark Theme CSS Customization
 st.markdown(
     """
     <style>
@@ -29,13 +29,56 @@ st.markdown(
     div.stButton > button:hover {
         background-color: #80D8FF !important;
     }
+    .main-title {
+        color: #00E5FF;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0px;
+        padding-bottom: 0px;
+    }
+    .sub-title {
+        color: #B0BEC5;
+        font-size: 1.2rem;
+        font-weight: 500;
+        margin-top: 4px;
+        margin-bottom: 25px;
+    }
+    .footer-text {
+        color: #8B949E;
+        font-size: 0.85rem;
+        text-align: center;
+        margin-top: 40px;
+        padding-top: 15px;
+        border-top: 1px solid #2E3646;
+    }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.title("⚡ Townsend Primary vs. Secondary Model")
+# --- HEADER SECTION: LOGO & COURSE DETAILS ---
+header_col1, header_col2 = st.columns([1, 5])
 
+with header_col1:
+    st.image(
+        "https://upload.wikimedia.org/wikipedia/en/c/c8/Assam_Engineering_College_Logo.png",
+        width=110,
+    )
+
+with header_col2:
+    st.markdown(
+        '<div class="main-title">EE601: High Voltage Engineering</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="sub-title">Module 1: Breakdown of Gases — Townsend Primary'
+        ' vs. Secondary Model</div>',
+        unsafe_allow_html=True,
+    )
+
+st.divider()
+
+# --- MAIN APP LAYOUT ---
 col1, col2 = st.columns([1, 2])
 
 with col1:
@@ -70,10 +113,10 @@ with col2:
     if run_button or True:
         x = np.linspace(0, d_max, 1000)
 
-        # Primary Model
+        # Primary Model calculation
         I_primary = I0 * np.exp(alpha * x)
 
-        # Secondary Model
+        # Secondary Model calculation
         denominator = 1 - gamma * (np.exp(alpha * x) - 1)
         breakdown_mask = denominator <= 0
 
@@ -93,7 +136,7 @@ with col2:
         breakdown_factor = gamma * (np.exp(alpha * d_max) - 1)
         V_applied = E * d_max
 
-        # Summary Display
+        # Summary Display Box
         st.markdown(
             f"""
             <div style="background-color: #161B22; padding: 15px; border-radius: 8px; border: 1px solid #2E3646;">
@@ -120,7 +163,7 @@ with col2:
                 " threshold NOT reached."
             )
 
-        # Dark Plot
+        # Matplotlib Plot
         plt.style.use("dark_background")
         fig, ax = plt.subplots(figsize=(8.5, 4.5))
 
@@ -180,3 +223,10 @@ with col2:
 
         plt.tight_layout()
         st.pyplot(fig)
+
+# --- FOOTER SECTION ---
+st.markdown(
+    '<div class="footer-text">Developed by Mr. Mondeep Mazumder, Assistant'
+    " Professor, Department of Electrical Engineering</div>",
+    unsafe_allow_html=True,
+)
