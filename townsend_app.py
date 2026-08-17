@@ -60,10 +60,8 @@ st.markdown(
 header_col1, header_col2 = st.columns([1, 5])
 
 with header_col1:
-    st.image(
-        "https://upload.wikimedia.org/wikipedia/en/c/c8/Assam_Engineering_College_Logo.png",
-        width=110,
-    )
+    # Loads logo directly from your GitHub repository file
+    st.image("aec logo.png", width=110)
 
 with header_col2:
     st.markdown(
