@@ -69,8 +69,7 @@ with header_col2:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div class="sub-title">Module 1: Breakdown of Gases — Townsend Primary'
-        ' vs. Secondary Model</div>',
+        '<div class="sub-title">Module 1: Breakdown of Gases</div>',
         unsafe_allow_html=True,
     )
 
