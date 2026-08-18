@@ -65,7 +65,7 @@ with header_col1:
 
 with header_col2:
     st.markdown(
-        '<div class="main-title">EE601: High Voltage Engineering</div>',
+        '<div class="main-title">EE1817PE31: High Voltage Engineering</div>',
         unsafe_allow_html=True,
     )
     st.markdown(
