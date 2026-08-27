@@ -159,20 +159,19 @@ true_d = true_V_impulse / mat_spec["E_int"]
 true_Lc = mat_spec["cr_ratio"] * 145.0
 true_cost_index = (true_d**2) * true_Lc * mat_spec["cost_factor"]
 
-# --- EVALUATION LOGIC ---
 st.divider()
 
+# --- EVALUATION AND PLOTS GENERATION ---
+# Only run and generate content when the evaluate button is clicked
 if evaluate_btn:
-    v_err = abs(student_Vimp - true_V_impulse) / true_V_impulse * 100
-    d_err = abs(student_d - true_d) / true_d * 100
-    lc_err = abs(student_Lc - true_Lc) / true_Lc * 100
-
     st.subheader("🔍 Design Verification & Diagnostics")
 
     if student_d <= 0 or student_Vimp <= 0 or student_Lc <= 0:
-        st.error("⚠️ **INCOMPLETE INPUTS:** Please enter your calculated values.")
+        st.error("⚠️ **INCOMPLETE INPUTS:** Please enter valid non-zero values for all calculation fields before evaluating.")
     else:
-        applied_stress = student_Vimp / student_d if student_d > 0 else 999.0
+        # Check pass/fail parameters
+        v_err = abs(student_Vimp - true_V_impulse) / true_V_impulse * 100
+        applied_stress = student_Vimp / student_d
         puncture_risk = applied_stress > mat_spec["E_int"]
         flashover_risk = student_Lc < true_Lc
         voltage_incorrect = v_err > 5.0
@@ -185,7 +184,7 @@ if evaluate_btn:
             )
             st.balloons()
         else:
-            st.error("❌ **DESIGN FAILURE DETECTED!** Review your calculations and parameters.")
+            st.error("❌ **DESIGN FAILURE DETECTED!** Review your calculations and parameters below.")
             if puncture_risk:
                 st.write(
                     f"💥 **INTERNAL DIELECTRIC PUNCTURE:** The applied electrical stress "
@@ -203,125 +202,125 @@ if evaluate_btn:
                     "does not match the expected impulse withstand voltage for these operating conditions."
                 )
 
-# --- VISUALIZATION PLOTS ---
-st.subheader("📈 Electrical & Dielectric Simulation Diagnostics")
+        # --- GENERATE PLOTS ONLY WHEN EVALUATED ---
+        st.subheader("📈 Electrical & Dielectric Simulation Diagnostics")
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "⚡ Lightning Impulse Wave",
-    "💥 Dielectric Breakdown Curve",
-    "🌿 Treeing & Tracking Severity",
-    "🌌 Radial Electric Field in Space",
-])
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "⚡ Lightning Impulse Wave",
+            "💥 Dielectric Breakdown Curve",
+            "🌿 Treeing & Tracking Severity",
+            "🌌 Radial Electric Field in Space",
+        ])
 
-plt.style.use("dark_background")
+        plt.style.use("dark_background")
 
-# 1. LIGHTNING IMPULSE WAVEFORM (1.2 / 50 μs)
-with tab1:
-    fig1, ax1 = plt.subplots(figsize=(8.5, 3.8))
-    fig1.patch.set_facecolor("#161B22")
-    ax1.set_facecolor("#0E1117")
+        # 1. LIGHTNING IMPULSE WAVEFORM
+        with tab1:
+            fig1, ax1 = plt.subplots(figsize=(8.5, 3.8))
+            fig1.patch.set_facecolor("#161B22")
+            ax1.set_facecolor("#0E1117")
 
-    t = np.linspace(0, 100, 1000)
-    
-    # Ideal Wave
-    v_ideal = true_V_impulse * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
-    ax1.plot(t, v_ideal, color="#FFEA00", linestyle="--", lw=1.8, label="Target Required Impulse Wave")
+            t = np.linspace(0, 100, 1000)
+            
+            # Ideal Wave
+            v_ideal = true_V_impulse * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
+            ax1.plot(t, v_ideal, color="#FFEA00", linestyle="--", lw=1.8, label="Target Required Impulse Wave")
 
-    # Student Wave
-    if student_Vimp > 0:
-        v_student = student_Vimp * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
-        ax1.plot(t, v_student, color="#00E5FF", lw=2.5, label=f"Student Calculated Wave (Peak = {student_Vimp:.1f} kV)")
+            # Student Wave
+            v_student = student_Vimp * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
+            ax1.plot(t, v_student, color="#00E5FF", lw=2.5, label=f"Student Calculated Wave (Peak = {student_Vimp:.1f} kV)")
 
-    ax1.axvline(1.2, color="#8B949E", linestyle=":", alpha=0.7, label=r"Front Time $t_1$ = 1.2 $\mu$s")
-    ax1.axvline(50.0, color="#8B949E", linestyle=":", alpha=0.7, label=r"Tail Time $t_2$ = 50 $\mu$s")
+            ax1.axvline(1.2, color="#8B949E", linestyle=":", alpha=0.7, label=r"Front Time $t_1$ = 1.2 $\mu$s")
+            ax1.axvline(50.0, color="#8B949E", linestyle=":", alpha=0.7, label=r"Tail Time $t_2$ = 50 $\mu$s")
 
-    ax1.set_title("Standard Lightning Impulse Waveform (1.2/50 $\mu$s) Comparison", color="#FFFFFF")
-    ax1.set_xlabel(r"Time ($\mu$s)")
-    ax1.set_ylabel("Voltage (kV)")
-    ax1.grid(True, color="#2E3646")
-    ax1.legend()
-    st.pyplot(fig1)
+            ax1.set_title("Standard Lightning Impulse Waveform (1.2/50 $\mu$s) Comparison", color="#FFFFFF")
+            ax1.set_xlabel(r"Time ($\mu$s)")
+            ax1.set_ylabel("Voltage (kV)")
+            ax1.grid(True, color="#2E3646")
+            ax1.legend()
+            st.pyplot(fig1)
 
-# 2. DIELECTRIC BREAKDOWN CURVE
-with tab2:
-    fig2, ax2 = plt.subplots(figsize=(8.5, 3.8))
-    fig2.patch.set_facecolor("#161B22")
-    ax2.set_facecolor("#0E1117")
+        # 2. DIELECTRIC BREAKDOWN CURVE
+        with tab2:
+            fig2, ax2 = plt.subplots(figsize=(8.5, 3.8))
+            fig2.patch.set_facecolor("#161B22")
+            ax2.set_facecolor("#0E1117")
 
-    d_arr = np.linspace(5, 60, 500)
-    v_withstand = d_arr * mat_spec["E_int"]
+            d_arr = np.linspace(5, 60, 500)
+            v_withstand = d_arr * mat_spec["E_int"]
 
-    ax2.plot(d_arr, v_withstand, color="#00E5FF", lw=2.5, label=f"Puncture Limit ({selected_mat})")
+            ax2.plot(d_arr, v_withstand, color="#00E5FF", lw=2.5, label=f"Puncture Limit ({selected_mat})")
 
-    if student_d > 0 and student_Vimp > 0:
-        is_safe = (student_Vimp / student_d) <= mat_spec["E_int"]
-        p_color = "#00E5FF" if is_safe else "#FF1744"
-        ax2.scatter([student_d], [student_Vimp], color=p_color, s=120, zorder=5, 
-                    label=f"Student Design Point ({'Safe' if is_safe else 'Puncture Risk'})")
+            is_safe = (student_Vimp / student_d) <= mat_spec["E_int"]
+            p_color = "#00E5FF" if is_safe else "#FF1744"
+            ax2.scatter([student_d], [student_Vimp], color=p_color, s=120, zorder=5, 
+                        label=f"Student Design Point ({'Safe' if is_safe else 'Puncture Risk'})")
 
-    ax2.set_title("Solid Insulation Puncture Boundary vs. Operating Point", color="#FFFFFF")
-    ax2.set_xlabel("Solid Thickness d (mm)")
-    ax2.set_ylabel("Withstand Voltage (kV)")
-    ax2.grid(True, color="#2E3646")
-    ax2.legend()
-    st.pyplot(fig2)
+            ax2.set_title("Solid Insulation Puncture Boundary vs. Operating Point", color="#FFFFFF")
+            ax2.set_xlabel("Solid Thickness d (mm)")
+            ax2.set_ylabel("Withstand Voltage (kV)")
+            ax2.grid(True, color="#2E3646")
+            ax2.legend()
+            st.pyplot(fig2)
 
-# 3. TREEING & TRACKING SEVERITY PLOT
-with tab3:
-    fig3, ax3 = plt.subplots(figsize=(8.5, 3.8))
-    fig3.patch.set_facecolor("#161B22")
-    ax3.set_facecolor("#0E1117")
+        # 3. TREEING & TRACKING SEVERITY PLOT
+        with tab3:
+            fig3, ax3 = plt.subplots(figsize=(8.5, 3.8))
+            fig3.patch.set_facecolor("#161B22")
+            ax3.set_facecolor("#0E1117")
 
-    x_surface = np.linspace(0, 100, 500)
+            x_surface = np.linspace(0, 100, 500)
 
-    # Ideal Curve
-    ideal_tracking = (np.exp(x_surface / 25 * 1.0) - 1) / 10.0
-    ax3.plot(x_surface, ideal_tracking, color="#FFEA00", linestyle="--", lw=1.8, label="Target Safe Tracking Profile")
+            # Ideal Curve
+            ideal_tracking = (np.exp(x_surface / 25 * 1.0) - 1) / 10.0
+            ax3.plot(x_surface, ideal_tracking, color="#FFEA00", linestyle="--", lw=1.8, label="Target Safe Tracking Profile")
 
-    # Student Curve
-    if student_Lc > 0:
-        stress_ratio = true_Lc / student_Lc
-        student_tracking = (np.exp(x_surface / 25 * stress_ratio) - 1) / 10.0
-        p_color = "#FF1744" if stress_ratio > 1.0 else "#00E5FF"
-        ax3.plot(x_surface, student_tracking, color=p_color, lw=2.5, label="Student Designed Tracking Profile")
+            # Student Curve
+            stress_ratio = true_Lc / student_Lc
+            student_tracking = (np.exp(x_surface / 25 * stress_ratio) - 1) / 10.0
+            p_color = "#FF1744" if stress_ratio > 1.0 else "#00E5FF"
+            ax3.plot(x_surface, student_tracking, color=p_color, lw=2.5, label="Student Designed Tracking Profile")
 
-    ax3.set_title("Surface Tracking Severity along Creepage Path", color="#FFFFFF")
-    ax3.set_xlabel("Creepage Distance Span (%)")
-    ax3.set_ylabel("Tracking Degradation (A.U.)")
-    ax3.grid(True, color="#2E3646")
-    ax3.legend()
-    st.pyplot(fig3)
+            ax3.set_title("Surface Tracking Severity along Creepage Path", color="#FFFFFF")
+            ax3.set_xlabel("Creepage Distance Span (%)")
+            ax3.set_ylabel("Tracking Degradation (A.U.)")
+            ax3.grid(True, color="#2E3646")
+            ax3.legend()
+            st.pyplot(fig3)
 
-# 4. RADIAL ELECTRIC FIELD IN SPACE
-with tab4:
-    fig4, ax4 = plt.subplots(figsize=(8.5, 3.8))
-    fig4.patch.set_facecolor("#161B22")
-    ax4.set_facecolor("#0E1117")
+        # 4. RADIAL ELECTRIC FIELD IN SPACE
+        with tab4:
+            fig4, ax4 = plt.subplots(figsize=(8.5, 3.8))
+            fig4.patch.set_facecolor("#161B22")
+            ax4.set_facecolor("#0E1117")
 
-    r_inner = 15.0  # mm
+            r_inner = 15.0  # mm
 
-    # Ideal Distribution Curve
-    r_outer_ideal = r_inner + true_d
-    r_space_ideal = np.linspace(r_inner, r_outer_ideal + 30.0, 500)
-    E_r_ideal = true_V_impulse / (r_space_ideal * np.log(r_outer_ideal / r_inner))
-    ax4.plot(r_space_ideal, E_r_ideal, color="#FFEA00", linestyle="--", lw=1.8, label=r"Ideal Field Distribution $E(r)$")
+            # Ideal Distribution Curve
+            r_outer_ideal = r_inner + true_d
+            r_space_ideal = np.linspace(r_inner, r_outer_ideal + 30.0, 500)
+            E_r_ideal = true_V_impulse / (r_space_ideal * np.log(r_outer_ideal / r_inner))
+            ax4.plot(r_space_ideal, E_r_ideal, color="#FFEA00", linestyle="--", lw=1.8, label=r"Ideal Field Distribution $E(r)$")
 
-    # Student Distribution Curve
-    if student_d > 0 and student_Vimp > 0:
-        r_outer_stud = r_inner + student_d
-        r_space_stud = np.linspace(r_inner, r_outer_stud + 30.0, 500)
-        E_r_stud = student_Vimp / (r_space_stud * np.log(r_outer_stud / r_inner))
-        ax4.plot(r_space_stud, E_r_stud, color="#00E5FF", lw=2.5, label=r"Student Field Distribution $E(r)$")
-        ax4.axvline(r_outer_stud, color="#00E5FF", linestyle=":", label="Student Outer Interface")
+            # Student Distribution Curve
+            r_outer_stud = r_inner + student_d
+            r_space_stud = np.linspace(r_inner, r_outer_stud + 30.0, 500)
+            E_r_stud = student_Vimp / (r_space_stud * np.log(r_outer_stud / r_inner))
+            ax4.plot(r_space_stud, E_r_stud, color="#00E5FF", lw=2.5, label=r"Student Field Distribution $E(r)$")
+            ax4.axvline(r_outer_stud, color="#00E5FF", linestyle=":", label="Student Outer Interface")
 
-    ax4.axhline(mat_spec["E_int"], color="#FF1744", linestyle=":", label=f"Material Breakdown Threshold ({mat_spec['E_int']} kV/mm)")
+            ax4.axhline(mat_spec["E_int"], color="#FF1744", linestyle=":", label=f"Material Breakdown Threshold ({mat_spec['E_int']} kV/mm)")
 
-    ax4.set_title("2D Radial Electric Field Stress Curve Comparison", color="#FFFFFF")
-    ax4.set_xlabel("Radial Distance r (mm)")
-    ax4.set_ylabel("Electric Field Stress E (kV/mm)")
-    ax4.grid(True, color="#2E3646")
-    ax4.legend()
-    st.pyplot(fig4)
+            ax4.set_title("2D Radial Electric Field Stress Curve Comparison", color="#FFFFFF")
+            ax4.set_xlabel("Radial Distance r (mm)")
+            ax4.set_ylabel("Electric Field Stress E (kV/mm)")
+            ax4.grid(True, color="#2E3646")
+            ax4.legend()
+            st.pyplot(fig4)
+
+else:
+    # Prompt shown before user runs the evaluation
+    st.info("👈 Enter your calculated parameters in the input panel above and click **🚀 Evaluate Bushing Design** to evaluate your design and render simulation diagnostics.")
 
 # --- FOOTER ---
 st.markdown(
