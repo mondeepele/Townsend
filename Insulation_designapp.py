@@ -26,12 +26,22 @@ st.markdown(
     }
     div.stButton > button:hover { background-color: #80D8FF !important; }
     .main-title { color: #00E5FF; font-size: 2.2rem; font-weight: 700; margin-bottom: 0px; }
-    .sub-title { color: #B0BEC5; font-size: 1.2rem; font-weight: 500; margin-top: 4px; margin-bottom: 20px; }
+    .sub-title { color: #B0BEC5; font-size: 1.2rem; font-weight: 500; margin-top: 4px; margin-bottom: 10px; }
+    .question-box {
+        background-color: #161B22;
+        border-left: 4px solid #00E5FF;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    .question-title { color: #00E5FF; font-weight: 600; font-size: 1.1rem; margin-bottom: 5px; }
+    .question-text { color: #E6EDF3; font-size: 1.0rem; line-height: 1.5; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# Title Header
 st.markdown(
     '<div class="main-title">EE18PE: High Voltage Engineering</div>',
     unsafe_allow_html=True,
@@ -40,6 +50,23 @@ st.markdown(
     '<div class="sub-title">Modules 1–3: Coastal Substation Bushing Insulation Design Lab</div>',
     unsafe_allow_html=True,
 )
+
+# Question Box (Displayed directly after the module name)
+st.markdown(
+    """
+    <div class="question-box">
+        <div class="question-title">📋 Design Problem Task</div>
+        <div class="question-text">
+            Design a solid dielectric condenser-type bushing for a <b>145 kV</b> coastal industrial substation subject to lightning surges. 
+            Select an appropriate solid dielectric material, calculate the required peak lightning impulse withstand voltage (V<sub>impulse</sub>), 
+            determine the minimum solid insulation thickness (d<sub>solid</sub>) to prevent internal puncture, and calculate the required creepage distance (L<sub>c</sub>) 
+            to avoid surface flashover under heavy coastal pollution. Submit your calculated values in the input panel below to evaluate your design.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.divider()
 
 # --- MATERIAL DATABASE ---
@@ -74,7 +101,7 @@ MATERIALS = {
     },
 }
 
-# --- SIDEBAR: PROBLEM STATEMENT & GIVEN DATA TABLES ---
+# --- SIDEBAR: OPERATING CONDITIONS & MATERIALS DATA ---
 st.sidebar.header("📌 Operating Conditions")
 
 op_data = {
@@ -149,7 +176,7 @@ with col_in2:
     )
     evaluate_btn = st.button("🚀 Evaluate Bushing Design")
 
-# --- EXACT GROUND TRUTH CALCULATIONS ---
+# --- GROUND TRUTH CALCULATIONS ---
 mat_spec = MATERIALS[selected_mat]
 true_V_peak_LG = (145.0 * np.sqrt(2)) / np.sqrt(3)  # ~118.39 kV
 true_V_surge = 4.2 * true_V_peak_LG                 # ~497.24 kV
@@ -161,15 +188,14 @@ true_cost_index = (true_d**2) * true_Lc * mat_spec["cost_factor"]
 
 st.divider()
 
-# --- EVALUATION AND PLOTS GENERATION ---
-# Only run and generate content when the evaluate button is clicked
+# --- EVALUATION LOGIC & CONDITIONAL PLOT GENERATION ---
+# Plots will ONLY be generated when the student submits data and clicks the evaluate button.
 if evaluate_btn:
     st.subheader("🔍 Design Verification & Diagnostics")
 
     if student_d <= 0 or student_Vimp <= 0 or student_Lc <= 0:
-        st.error("⚠️ **INCOMPLETE INPUTS:** Please enter valid non-zero values for all calculation fields before evaluating.")
+        st.error("⚠️ **INCOMPLETE INPUTS:** Please enter non-zero calculated parameters before running the evaluation.")
     else:
-        # Check pass/fail parameters
         v_err = abs(student_Vimp - true_V_impulse) / true_V_impulse * 100
         applied_stress = student_Vimp / student_d
         puncture_risk = applied_stress > mat_spec["E_int"]
@@ -177,7 +203,7 @@ if evaluate_btn:
         voltage_incorrect = v_err > 5.0
 
         if not puncture_risk and not flashover_risk and not voltage_incorrect:
-            st.success("✅ **DESIGN APPROVED!** Your parameters are safe and within acceptable tolerances.")
+            st.success("✅ **DESIGN APPROVED!** Your parameters are safe and within acceptable engineering tolerances.")
             st.info(
                 f"📊 **Material Volumetric Cost Index:** {true_cost_index:.2e} | "
                 f"Material: {selected_mat}"
@@ -188,21 +214,21 @@ if evaluate_btn:
             if puncture_risk:
                 st.write(
                     f"💥 **INTERNAL DIELECTRIC PUNCTURE:** The applied electrical stress "
-                    f"({applied_stress:.2f} kV/mm) exceeds the allowable breakdown strength of "
+                    f"({applied_stress:.2f} kV/mm) exceeds the breakdown strength of "
                     f"{selected_mat} ({mat_spec['E_int']} kV/mm)."
                 )
             if flashover_risk:
                 st.write(
                     "⚡ **SURFACE FLASHOVER:** Your designed Creepage Distance (L_c) is insufficient "
-                    "for the specified coastal pollution severity, risking external arc-over."
+                    "for the coastal pollution severity level."
                 )
             if voltage_incorrect:
                 st.write(
                     "⚠️ **INCORRECT IMPULSE VOLTAGE:** Your calculated V_impulse value "
-                    "does not match the expected impulse withstand voltage for these operating conditions."
+                    "does not match the expected impulse withstand voltage."
                 )
 
-        # --- GENERATE PLOTS ONLY WHEN EVALUATED ---
+        # GENERATE PLOTS ONLY WHEN EVALUATE BUTTON IS CLICKED AND INPUTS ARE VALID
         st.subheader("📈 Electrical & Dielectric Simulation Diagnostics")
 
         tab1, tab2, tab3, tab4 = st.tabs([
@@ -222,7 +248,7 @@ if evaluate_btn:
 
             t = np.linspace(0, 100, 1000)
             
-            # Ideal Wave
+            # Target Reference Wave
             v_ideal = true_V_impulse * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
             ax1.plot(t, v_ideal, color="#FFEA00", linestyle="--", lw=1.8, label="Target Required Impulse Wave")
 
@@ -319,8 +345,8 @@ if evaluate_btn:
             st.pyplot(fig4)
 
 else:
-    # Prompt shown before user runs the evaluation
-    st.info("👈 Enter your calculated parameters in the input panel above and click **🚀 Evaluate Bushing Design** to evaluate your design and render simulation diagnostics.")
+    # Shown prior to clicking evaluation button
+    st.info("👈 Enter your calculated parameters in the input panel above and click **🚀 Evaluate Bushing Design** to execute evaluation and generate plots.")
 
 # --- FOOTER ---
 st.markdown(
