@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import streamlit as st
 
 # Configure Page
@@ -73,23 +74,44 @@ MATERIALS = {
     },
 }
 
-# --- SIDEBAR: PROBLEM STATEMENT & GIVEN DATA ---
-st.sidebar.header("📌 Given Operating Conditions")
-st.sidebar.write(r"**System Voltage ($V_{max}$):** 145.0 kV (rms L-L)")
-st.sidebar.write(r"**Overvoltage Factor ($k_p$):** 4.2 p.u.")
-st.sidebar.write(r"**Safety Factor ($SF$):** 1.25")
-st.sidebar.write("**Environment:** Coastal Industrial (Salt spray)")
-st.sidebar.write(
-    r"**Pollution Factor ($k_{env}$):** 0.35 | Air Density ($\delta$): 1.0"
-)
+# --- SIDEBAR: PROBLEM STATEMENT & GIVEN DATA TABLES ---
+st.sidebar.header("📌 Operating Conditions")
 
-st.sidebar.markdown("---")
+op_data = {
+    "Parameter": [
+        "System Voltage (V_max)",
+        "Overvoltage Factor (k_p)",
+        "Safety Factor (SF)",
+        "Environment",
+        "Pollution Factor (k_env)",
+        "Air Density (δ)",
+    ],
+    "Value": [
+        "145.0 kV (rms L-L)",
+        "4.2 p.u.",
+        "1.25",
+        "Coastal Industrial",
+        "0.35",
+        "1.0",
+    ],
+}
+df_op = pd.DataFrame(op_data)
+st.sidebar.table(df_op)
+
 st.sidebar.markdown("### 📚 Candidate Materials Data")
+
+mat_table_data = []
 for name, spec in MATERIALS.items():
-    st.sidebar.markdown(f"**{name}**")
-    st.sidebar.caption(
-        f"E_int: {spec['E_int']} kV/mm | \u03b5_r: {spec['er']} | Creepage Ratio: {spec['cr_ratio']} mm/kV"
+    mat_table_data.append(
+        {
+            "Material": name.split(":")[1].strip(),
+            "E_int (kV/mm)": spec["E_int"],
+            "ε_r": spec["er"],
+            "Creepage Ratio (mm/kV)": spec["cr_ratio"],
+        }
     )
+df_mat = pd.DataFrame(mat_table_data)
+st.sidebar.table(df_mat)
 
 # --- MAIN DESIGN INPUTS ---
 st.subheader("🛠️ Student Design Input Panel")
@@ -127,7 +149,7 @@ with col_in2:
     )
     evaluate_btn = st.button("🚀 Evaluate Bushing Design")
 
-# --- GROUND TRUTH CALCULATIONS ---
+# --- EXACT GROUND TRUTH CALCULATIONS ---
 mat_spec = MATERIALS[selected_mat]
 true_V_peak_LG = (145.0 * np.sqrt(2)) / np.sqrt(3)  # ~118.39 kV
 true_V_surge = 4.2 * true_V_peak_LG                 # ~497.24 kV
@@ -153,35 +175,32 @@ if evaluate_btn:
         applied_stress = student_Vimp / student_d if student_d > 0 else 999.0
         puncture_risk = applied_stress > mat_spec["E_int"]
         flashover_risk = student_Lc < true_Lc
+        voltage_incorrect = v_err > 5.0
 
-        if not puncture_risk and not flashover_risk and v_err <= 5.0:
-            st.success(
-                f"✅ **DESIGN APPROVED!** Your parameters safely withstand the "
-                f"{true_V_impulse:.1f} kV impulse."
-            )
+        if not puncture_risk and not flashover_risk and not voltage_incorrect:
+            st.success("✅ **DESIGN APPROVED!** Your parameters are safe and within acceptable tolerances.")
             st.info(
                 f"📊 **Material Volumetric Cost Index:** {true_cost_index:.2e} | "
                 f"Material: {selected_mat}"
             )
             st.balloons()
         else:
-            st.error("❌ **DESIGN FAILURE DETECTED!**")
+            st.error("❌ **DESIGN FAILURE DETECTED!** Review your calculations and parameters.")
             if puncture_risk:
                 st.write(
-                    f"💥 **INTERNAL DIELECTRIC PUNCTURE:** Applied stress ({applied_stress:.2f} kV/mm) "
-                    f"exceeds breakdown strength ({mat_spec['E_int']} kV/mm). "
-                    "**Result:** Irreversible solid insulation puncture & treeing."
+                    f"💥 **INTERNAL DIELECTRIC PUNCTURE:** The applied electrical stress "
+                    f"({applied_stress:.2f} kV/mm) exceeds the allowable breakdown strength of "
+                    f"{selected_mat} ({mat_spec['E_int']} kV/mm)."
                 )
             if flashover_risk:
                 st.write(
-                    f"⚡ **SURFACE FLASHOVER:** Designed Creepage ({student_Lc} mm) "
-                    f"is less than required ({true_Lc} mm). "
-                    "**Result:** Pollution tracking leading to external arc-over."
+                    "⚡ **SURFACE FLASHOVER:** Your designed Creepage Distance (L_c) is insufficient "
+                    "for the specified coastal pollution severity, risking external arc-over."
                 )
-            if v_err > 5.0:
+            if voltage_incorrect:
                 st.write(
-                    f"⚠️ **WRONG SURGE VOLTAGE:** Your impulse calculation ({student_Vimp} kV) "
-                    f"deviates from expected ({true_V_impulse:.1f} kV)."
+                    "⚠️ **INCORRECT IMPULSE VOLTAGE:** Your calculated V_impulse value "
+                    "does not match the expected impulse withstand voltage for these operating conditions."
                 )
 
 # --- VISUALIZATION PLOTS ---
@@ -203,14 +222,20 @@ with tab1:
     ax1.set_facecolor("#0E1117")
 
     t = np.linspace(0, 100, 1000)
-    v_peak = student_Vimp if student_Vimp > 0 else true_V_impulse
-    v_t = v_peak * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
+    
+    # Ideal Wave
+    v_ideal = true_V_impulse * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
+    ax1.plot(t, v_ideal, color="#FFEA00", linestyle="--", lw=1.8, label="Target Required Impulse Wave")
 
-    ax1.plot(t, v_t, color="#00E5FF", lw=2.5, label="Transient Impulse Wave")
-    ax1.axvline(1.2, color="#FFEA00", linestyle="--", alpha=0.7, label=r"Front Time $t_1$ = 1.2 $\mu$s")
-    ax1.axvline(50.0, color="#FF1744", linestyle="--", alpha=0.7, label=r"Tail Time $t_2$ = 50 $\mu$s")
+    # Student Wave
+    if student_Vimp > 0:
+        v_student = student_Vimp * 1.037 * (np.exp(-0.014 * t) - np.exp(-2.47 * t))
+        ax1.plot(t, v_student, color="#00E5FF", lw=2.5, label=f"Student Calculated Wave (Peak = {student_Vimp:.1f} kV)")
 
-    ax1.set_title(f"Standard Lightning Impulse Waveform 1.2/50 $\mu$s (Peak = {v_peak:.1f} kV)", color="#FFFFFF")
+    ax1.axvline(1.2, color="#8B949E", linestyle=":", alpha=0.7, label=r"Front Time $t_1$ = 1.2 $\mu$s")
+    ax1.axvline(50.0, color="#8B949E", linestyle=":", alpha=0.7, label=r"Tail Time $t_2$ = 50 $\mu$s")
+
+    ax1.set_title("Standard Lightning Impulse Waveform (1.2/50 $\mu$s) Comparison", color="#FFFFFF")
     ax1.set_xlabel(r"Time ($\mu$s)")
     ax1.set_ylabel("Voltage (kV)")
     ax1.grid(True, color="#2E3646")
@@ -226,14 +251,15 @@ with tab2:
     d_arr = np.linspace(5, 60, 500)
     v_withstand = d_arr * mat_spec["E_int"]
 
-    ax2.plot(d_arr, v_withstand, color="#00E5FF", lw=2.5, label=f"Puncture Threshold ({selected_mat})")
-    ax2.axhline(true_V_impulse, color="#FFEA00", linestyle=":", lw=2, label=f"Design Impulse Level ({true_V_impulse:.1f} kV)")
+    ax2.plot(d_arr, v_withstand, color="#00E5FF", lw=2.5, label=f"Puncture Limit ({selected_mat})")
 
     if student_d > 0 and student_Vimp > 0:
-        p_color = "#FF1744" if (student_Vimp / student_d) > mat_spec["E_int"] else "#00E5FF"
-        ax2.scatter([student_d], [student_Vimp], color=p_color, s=120, zorder=5, label="Student Operating Point")
+        is_safe = (student_Vimp / student_d) <= mat_spec["E_int"]
+        p_color = "#00E5FF" if is_safe else "#FF1744"
+        ax2.scatter([student_d], [student_Vimp], color=p_color, s=120, zorder=5, 
+                    label=f"Student Design Point ({'Safe' if is_safe else 'Puncture Risk'})")
 
-    ax2.set_title("Solid Insulation Puncture Boundary", color="#FFFFFF")
+    ax2.set_title("Solid Insulation Puncture Boundary vs. Operating Point", color="#FFFFFF")
     ax2.set_xlabel("Solid Thickness d (mm)")
     ax2.set_ylabel("Withstand Voltage (kV)")
     ax2.grid(True, color="#2E3646")
@@ -247,11 +273,19 @@ with tab3:
     ax3.set_facecolor("#0E1117")
 
     x_surface = np.linspace(0, 100, 500)
-    stress_ratio = (true_Lc / student_Lc) if student_Lc > 0 else 2.5
-    tracking_severity = (np.exp(x_surface / 25 * stress_ratio) - 1) / 10.0
 
-    ax3.plot(x_surface, tracking_severity, color="#FF1744" if stress_ratio > 1.0 else "#00E5FF", lw=2.5, label="Surface Degradation Rate")
-    ax3.set_title(f"Surface Tracking Severity along Creepage Path (Stress Multiplier: {stress_ratio:.2f}x)", color="#FFFFFF")
+    # Ideal Curve
+    ideal_tracking = (np.exp(x_surface / 25 * 1.0) - 1) / 10.0
+    ax3.plot(x_surface, ideal_tracking, color="#FFEA00", linestyle="--", lw=1.8, label="Target Safe Tracking Profile")
+
+    # Student Curve
+    if student_Lc > 0:
+        stress_ratio = true_Lc / student_Lc
+        student_tracking = (np.exp(x_surface / 25 * stress_ratio) - 1) / 10.0
+        p_color = "#FF1744" if stress_ratio > 1.0 else "#00E5FF"
+        ax3.plot(x_surface, student_tracking, color=p_color, lw=2.5, label="Student Designed Tracking Profile")
+
+    ax3.set_title("Surface Tracking Severity along Creepage Path", color="#FFFFFF")
     ax3.set_xlabel("Creepage Distance Span (%)")
     ax3.set_ylabel("Tracking Degradation (A.U.)")
     ax3.grid(True, color="#2E3646")
@@ -264,19 +298,25 @@ with tab4:
     fig4.patch.set_facecolor("#161B22")
     ax4.set_facecolor("#0E1117")
 
-    r_inner = 15.0
-    r_outer = r_inner + (student_d if student_d > 0 else true_d)
-    r_space = np.linspace(r_inner, r_outer + 30.0, 500)
+    r_inner = 15.0  # mm
 
-    v_applied = student_Vimp if student_Vimp > 0 else true_V_impulse
-    geom_factor = np.log(r_outer / r_inner)
-    E_r = v_applied / (r_space * geom_factor)
+    # Ideal Distribution Curve
+    r_outer_ideal = r_inner + true_d
+    r_space_ideal = np.linspace(r_inner, r_outer_ideal + 30.0, 500)
+    E_r_ideal = true_V_impulse / (r_space_ideal * np.log(r_outer_ideal / r_inner))
+    ax4.plot(r_space_ideal, E_r_ideal, color="#FFEA00", linestyle="--", lw=1.8, label=r"Ideal Field Distribution $E(r)$")
 
-    ax4.plot(r_space, E_r, color="#00E5FF", lw=2.5, label=r"Field Distribution $E(r)$")
-    ax4.axvline(r_outer, color="#FFEA00", linestyle="--", label="Solid/Air Interface Boundary")
-    ax4.axhline(mat_spec["E_int"], color="#FF1744", linestyle=":", label=f"Solid Limit ({mat_spec['E_int']} kV/mm)")
+    # Student Distribution Curve
+    if student_d > 0 and student_Vimp > 0:
+        r_outer_stud = r_inner + student_d
+        r_space_stud = np.linspace(r_inner, r_outer_stud + 30.0, 500)
+        E_r_stud = student_Vimp / (r_space_stud * np.log(r_outer_stud / r_inner))
+        ax4.plot(r_space_stud, E_r_stud, color="#00E5FF", lw=2.5, label=r"Student Field Distribution $E(r)$")
+        ax4.axvline(r_outer_stud, color="#00E5FF", linestyle=":", label="Student Outer Interface")
 
-    ax4.set_title("2D Radial Electric Field Distribution Space Curve", color="#FFFFFF")
+    ax4.axhline(mat_spec["E_int"], color="#FF1744", linestyle=":", label=f"Material Breakdown Threshold ({mat_spec['E_int']} kV/mm)")
+
+    ax4.set_title("2D Radial Electric Field Stress Curve Comparison", color="#FFFFFF")
     ax4.set_xlabel("Radial Distance r (mm)")
     ax4.set_ylabel("Electric Field Stress E (kV/mm)")
     ax4.grid(True, color="#2E3646")
