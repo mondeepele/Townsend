@@ -32,7 +32,7 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="main-title">EE601: High Voltage Engineering</div>',
+    '<div class="main-title">EE18PE: High Voltage Engineering</div>',
     unsafe_allow_html=True,
 )
 st.markdown(
